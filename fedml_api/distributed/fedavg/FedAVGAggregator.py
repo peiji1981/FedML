@@ -85,9 +85,12 @@ class FedAVGAggregator(object):
         return averaged_params
 
     def client_sampling(self, round_idx, client_num_in_total, client_num_per_round):
-        num_clients = min(client_num_per_round, client_num_in_total)
-        np.random.seed(round_idx)  # make sure for each comparison, we are selecting the same clients each round
-        client_indexes = np.random.choice(range(client_num_in_total), num_clients, replace=False)
+        if client_num_in_total == client_num_per_round:
+            client_indexes = [client_index for client_index in range(client_num_in_total)]
+        else:
+            num_clients = min(client_num_per_round, client_num_in_total)
+            np.random.seed(round_idx)  # make sure for each comparison, we are selecting the same clients each round
+            client_indexes = np.random.choice(range(client_num_in_total), num_clients, replace=False)
         logging.info("client_indexes = %s" % str(client_indexes))
         return client_indexes
 
@@ -113,6 +116,13 @@ class FedAVGAggregator(object):
                 test_tot_corrects.append(copy.deepcopy(test_tot_correct))
                 test_num_samples.append(copy.deepcopy(test_num_sample))
                 test_losses.append(copy.deepcopy(test_loss))
+
+                """
+                Note: CI environment is CPU-based computing. 
+                The training speed for RNN training is to slow in this setting, so we only test a client to make sure there is no programming error.
+                """
+                if self.args.ci == 1:
+                    break
 
             # test on training dataset
             train_acc = sum(train_tot_corrects) / sum(train_num_samples)

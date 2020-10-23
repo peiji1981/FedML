@@ -15,18 +15,22 @@ client_map_test = None
 train_file_path = '../../../data/fed_cifar100/cifar100_train.h5'
 test_file_path = '../../../data/fed_cifar100/cifar100_test.h5'
 
+
 def get_client_map(client_map, client_id = None, client_num = None):
     if client_map == None:
         random.shuffle(client_id)
         client_map = {k:[client_id[i] for i in range(k, len(client_id), client_num)] for k in range(client_num)}
     return client_map
 
+
 def get_dataloader(dataset, data_dir, train_bs, test_bs, client_idx = None):
     
     train_h5 = h5py.File(train_file_path, 'r')
     test_h5 = h5py.File(test_file_path,'r')
     train_x, train_y, train_id = train_h5['image'], train_h5['label'], train_h5['id']
+    train_x = np.moveaxis(train_x[:].astype(np.float32), -1, 1)
     test_x, test_y, test_id = test_h5['image'], test_h5['label'], test_h5['id']
+    test_x = np.moveaxis(test_x[:].astype(np.float32), -1, 1)
     
     if client_idx is None:
         train_ds = data.TensorDataset(torch.tensor(train_x[:,:]), torch.tensor(train_y[:]))
@@ -51,14 +55,17 @@ def get_dataloader(dataset, data_dir, train_bs, test_bs, client_idx = None):
             test_h5_idx = np.concatenate((test_h5_idx, np.argwhere(test_id[()] == client_id)[:,0]))
         test_h5_idx.sort()
         test_ds = data.TensorDataset(torch.tensor(test_x[test_h5_idx,:]), torch.tensor(test_y[test_h5_idx]))
-        test_dl = data.DataLoader(dataset = test_ds, batch_size=test_bs, shuffle = True, drop_last = False)    
+        if len(test_ds) != 0:
+            test_dl = data.DataLoader(dataset = test_ds, batch_size=test_bs, shuffle = True, drop_last = False)
+        else:
+            test_dl = None
     
     train_h5.close()
     test_h5.close()
     return train_dl, test_dl
 
 
-def load_partition_data_distributed_federated_cifar100(process_id, dataset, data_dir, client_number, batch_size):
+def load_partition_data_distributed_federated_cifar100(process_id, dataset, data_dir, client_number=500, batch_size=20):
     
     train_h5 = h5py.File(train_file_path, 'r')
     class_num = len(np.unique(train_h5['label'][()]))
@@ -84,14 +91,14 @@ def load_partition_data_distributed_federated_cifar100(process_id, dataset, data
         train_h5.close()
         test_h5.close()
         train_data_local, test_data_local = get_dataloader(dataset, data_dir, batch_size, batch_size, process_id - 1)
-        train_data_num = local_data_num = len(train_data_local) + len(test_data_local)
+        train_data_num = local_data_num = len(train_data_local.dataset)
         logging.info("rank = %d, local_sample_number = %d" % (process_id, local_data_num))
         train_data_global = None
         test_data_global = None
-    return train_data_num, train_data_global, test_data_global, local_data_num, train_data_local, test_data_local, class_num
+    return client_number, train_data_num, train_data_global, test_data_global, local_data_num, train_data_local, test_data_local, class_num
 
 
-def load_partition_data_federated_cifar100(dataset, data_dir, client_number, batch_size):
+def load_partition_data_federated_cifar100(dataset, data_dir, client_number=500, batch_size=20):
     
     train_data_global, test_data_global = get_dataloader(dataset, data_dir, batch_size, batch_size)
     train_data_num = len(train_data_global)
@@ -113,15 +120,15 @@ def load_partition_data_federated_cifar100(dataset, data_dir, client_number, bat
     for client_idx in range(client_number):
     
         train_data_local, test_data_local = get_dataloader(dataset, data_dir, batch_size, batch_size, client_idx)
-        local_data_num = len(train_data_local) + len(test_data_local)
+        local_data_num = len(train_data_local.dataset)
         data_local_num_dict[client_idx] = local_data_num
         logging.info("client_idx = %d, local_sample_number = %d" % (client_idx, local_data_num))
-        logging.info("client_idx = %d, batch_num_train_local = %d, batch_num_test_local = %d" % (
-            client_idx, len(train_data_local), len(test_data_local)))
+        logging.info("client_idx = %d, batch_num_train_local = %d" % (
+            client_idx, len(train_data_local)))
         train_data_local_dict[client_idx] = train_data_local
         test_data_local_dict[client_idx] = test_data_local
     
-    return train_data_num, test_data_num, train_data_global, test_data_global, \
+    return client_number, train_data_num, test_data_num, train_data_global, test_data_global, \
         data_local_num_dict, train_data_local_dict, test_data_local_dict, class_num
 
 

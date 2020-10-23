@@ -1,11 +1,12 @@
-import torch.nn as nn
 import math
+
+import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152']
 
-from fedml_api.model.deep_neural_networks.group_normalization import GroupNorm2d
+from fedml_api.model.cv.group_normalization import GroupNorm2d
 
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
@@ -20,6 +21,7 @@ def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=1, bias=False)
+
 
 def norm2d(planes, num_channels_per_group=32):
     print("num_channels_per_group:{}".format(num_channels_per_group))
@@ -121,7 +123,8 @@ class ResNet(nn.Module):
                                        group_norm=group_norm)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
                                        group_norm=group_norm)
-        self.avgpool = nn.AvgPool2d(7, stride=1)
+        # self.avgpool = nn.AvgPool2d(7, stride=1)
+        self.avgpool = nn.AvgPool2d(1)
         self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
@@ -140,7 +143,6 @@ class ResNet(nn.Module):
                 m.bn3.weight.data.fill_(0)
             if isinstance(m, BasicBlock):
                 m.bn2.weight.data.fill_(0)
-
 
     def _make_layer(self, block, planes, blocks, stride=1, group_norm=0):
         downsample = None

@@ -12,7 +12,7 @@ https://github.com/google-research/federated/blob/master/utils/datasets/stackove
 '''
 
 
-def get_most_frequent_words(vocab_size=10):
+def get_most_frequent_words(vocab_size=10000):
     frequent_words = []
     with open(word_count_file_path, 'r') as f:
         frequent_words = [next(f).split()[0] for i in range(vocab_size)]
@@ -84,7 +84,7 @@ def preprocess_targets(tags):
         tag = [tag_to_id(t) for t in tag]
         onehot = np.zeros((len(tag), tag_size + 1))
         onehot[np.arange(len(tag)), tag] = 1
-        return np.mean(onehot, axis=0)[:tag_size]
+        return np.sum(onehot, axis=0)#[:tag_size]
 
     return [to_bag_of_words(tag) for tag in tags]
 
